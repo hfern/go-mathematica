@@ -26,7 +26,7 @@ func Marshal(v interface{}) ([]byte, error) {
 	}
 
 	bio.Flush()
-	return e, bbuf.Bytes()
+	return bbuf.Bytes(), e
 }
 
 func encodeValue(buf *bufio.Writer, v interface{}) (e error) {
