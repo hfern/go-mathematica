@@ -3,15 +3,18 @@ package mathematica
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
 )
 
-var (
-	CantEncodeValue = errors.New("Can't encode this value!")
-)
+type CantEncode struct {
+	Kind reflect.Kind
+}
+
+func (c CantEncode) Error() string {
+	return fmt.Sprint("go-mathematica can't marshall type ", c.Kind)
+}
 
 type Marshaler interface {
 	MarshalMathematica() ([]byte, error)
@@ -85,8 +88,10 @@ func encodeValueReflect(buf *bufio.Writer, vt reflect.Value) (e error) {
 		return encodeArray(buf, vt)
 	case reflect.Struct:
 		return encodeStruct(buf, vt)
+	case reflect.Map:
+		return encodeMap(buf, vt)
 	default:
-		return CantEncodeValue
+		return CantEncode{Kind: vt.Kind()}
 	}
 	return nil
 }
@@ -145,6 +150,41 @@ func encodeStruct(buf *bufio.Writer, vt reflect.Value) (e error) {
 		e = encodeValue(buf, vt.Field(i).Interface())
 		if e != nil {
 			return
+		}
+	}
+
+	buf.WriteString("|>")
+
+	return
+}
+
+func encodeMap(buf *bufio.Writer, vt reflect.Value) (e error) {
+
+	keys := vt.MapKeys()
+	kL := len(keys)
+
+	first := true
+
+	buf.WriteString("<|")
+
+	for i := 0; i < kL; i++ {
+		k := keys[i]
+		v := vt.MapIndex(k)
+
+		if first {
+			first = false
+		} else {
+			buf.WriteByte(',')
+		}
+
+		if e = encodeValue(buf, k.Interface()); e != nil {
+			return e
+		}
+
+		buf.WriteString("->")
+
+		if e = encodeValue(buf, v.Interface()); e != nil {
+			return e
 		}
 	}
 
